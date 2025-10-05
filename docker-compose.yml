@@ -1,0 +1,43 @@
+version: "3.8"
+
+services:
+  # --- Redpanda Broker ---
+  redpanda:
+    container_name: redpanda
+    image: docker.redpanda.com/redpandadata/redpanda:latest
+    command:
+      - redpanda start
+      - --kafka-addr 0.0.0.0:9092
+      - --advertise-kafka-addr localhost:9092
+      - --rpc-addr 0.0.0.0:9641
+      - --advertise-rpc-addr localhost:9641
+      - --set redpanda.auto_create_topics_enabled=true
+    ports:
+      - "9092:9092" # Kafka API for producers/consumers
+      - "9641:9641" # Redpanda Admin API (RPC)
+      - "8081:8081" # HTTP Proxy (if you want to enable it later)
+    volumes:
+      - redpanda-data:/var/lib/redpanda/data
+    healthcheck:
+      test: ["CMD", "rpk", "cluster", "health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # --- Redpanda Console (UI) ---
+  console:
+    container_name: redpanda-console
+    image: docker.redpanda.com/redpandadata/console:latest
+    ports:
+      - "8080:8080" # Web UI access
+    environment:
+      # Point the Console to the Redpanda broker's internal address and port
+      KAFKA_BROKERS: redpanda:9092
+      # Enable a simple configuration property for Redpanda (optional, but good practice)
+      KAFKA_TLS_ENABLED: "false"
+    depends_on:
+      redpanda:
+        condition: service_healthy
+
+volumes:
+  redpanda-data:
